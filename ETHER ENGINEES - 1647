@@ -1,0 +1,139 @@
+Conversation opened. 1 read message. 
+
+Skip to content
+Using Gmail with screen readers
+Enable desktop notifications for Gmail.
+   OK  No thanks
+7 of 2,467
+project code
+Inbox
+
+Jaswanth Menda <mendajaswanth@gmail.com>
+12:21 AM (16 hours ago)
+to shivammaurya1949@gmail.com, me
+
+import pandas as pd
+import numpy as np
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, VotingRegressor
+from sklearn.neural_network import MLPRegressor
+import matplotlib.pyplot as plt
+
+# Load the dataset
+file_path = '/content/commodity_prices_simulated.csv'  # Update with your actual file path
+df = pd.read_csv(file_path)
+
+# Data Preprocessing
+df['Date'] = pd.to_datetime(df['Date'])
+df['Year'] = df['Date'].dt.year
+df['Month'] = df['Date'].dt.month
+df = df.drop(columns=['Date'])
+
+X = df.drop(columns=['Price'])
+y = df['Price']
+
+categorical_cols = ['Commodity']
+numerical_cols = [col for col in X.columns if col not in categorical_cols]
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('num', StandardScaler(), numerical_cols),
+        ('cat', OneHotEncoder(), categorical_cols)
+    ]
+)
+
+# Model Building
+rf = RandomForestRegressor(n_estimators=100, random_state=42)
+gbr = GradientBoostingRegressor(n_estimators=100, random_state=42)
+mlp = MLPRegressor(hidden_layer_sizes=(64, 64), max_iter=500, random_state=42)
+ensemble_model = VotingRegressor(estimators=[('rf', rf), ('gbr', gbr), ('mlp', mlp)])
+model_pipeline = Pipeline(steps=[('preprocessor', preprocessor), ('model', ensemble_model)])
+
+# Train-Test Split
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model_pipeline.fit(X_train, y_train)
+
+# Function to get user inputs
+def get_user_inputs():
+    # Get the year range for future prediction
+    start_year = int(input("Enter the start year for prediction (e.g., 2024): "))
+    end_year = int(input(f"Enter the end year for prediction (e.g., 2025): "))
+
+    # Get the type of commodity
+    available_commodities = ['Potato', 'Onion', 'Gram']
+    print(f"Available commodities: {', '.join(available_commodities)}")
+    commodity = input("Enter the commodity for prediction (e.g., Potato): ")
+
+    # Validate commodity input
+    while commodity not in available_commodities:
+        print("Invalid commodity name! Please choose from the available options.")
+        commodity = input(f"Enter the commodity for prediction (e.g., Potato): ")
+
+    return start_year, end_year, commodity
+
+# Function to generate future data
+def generate_future_data(start_year, end_year, base_data, commodities):
+    future_dates = pd.date_range(start=f'{start_year}-01-01', end=f'{end_year}-12-31', freq='M')
+    future_data = []
+    for commodity in commodities:
+        for date in future_dates:
+            last_known_data = base_data[base_data['Commodity'] == commodity].iloc[-1]
+            production = last_known_data['Production'] * (1 + np.random.normal(0, 0.05))
+            weather = last_known_data['Weather'] + np.random.normal(0, 0.5)
+            import_vol = last_known_data['Import'] * (1 + np.random.normal(0, 0.05))
+            export_vol = last_known_data['Export'] * (1 + np.random.normal(0, 0.05))
+            market_demand = last_known_data['Market_Demand'] * (1 + np.random.normal(0, 0.05))
+            stock_level = last_known_data['Stock_Level'] * (1 + np.random.normal(0, 0.05))
+            policy_impact = last_known_data['Policy_Impact']
+            future_data.append([date, commodity, production, weather, import_vol, export_vol, market_demand, stock_level, policy_impact])
+    
+    future_df = pd.DataFrame(future_data, columns=['Date', 'Commodity', 'Production', 'Weather', 'Import', 'Export', 'Market_Demand', 'Stock_Level', 'Policy_Impact'])
+    future_df['Year'] = future_df['Date'].dt.year
+    future_df['Month'] = future_df['Date'].dt.month
+    future_df = future_df.drop(columns=['Date'])
+    
+    return future_df
+
+# Function to filter and predict future prices based on user input
+def predict_commodity_prices(start_year, end_year, commodity, model_pipeline, base_data):
+    # Generate future data based on user input
+    future_data = generate_future_data(start_year, end_year, base_data, commodities=[commodity])
+    
+    # Predict future prices
+    future_prices = model_pipeline.predict(future_data)
+    
+    # Add predictions to the future_data DataFrame
+    future_data['Predicted_Price'] = future_prices
+    
+    return future_data
+
+# Function to visualize predictions for the selected commodity
+def plot_user_selected_predictions(future_data, commodity, start_year, end_year):
+    commodity_data = future_data[future_data['Commodity'] == commodity]
+    plt.figure(figsize=(10, 6))
+    plt.plot(commodity_data['Year'] + commodity_data['Month']/12.0, commodity_data['Predicted_Price'], marker='o')
+    plt.title(f'Predicted Prices for {commodity} ({start_year}-{end_year})')
+    plt.xlabel('Year')
+    plt.ylabel('Predicted Price (INR/kg)')
+    plt.grid(True)
+    plt.show()
+
+# Main function to run the prediction
+def main():
+    # Get user inputs
+    start_year, end_year, commodity = get_user_inputs()
+    
+    # Predict future prices based on user input
+    future_data = predict_commodity_prices(start_year, end_year, commodity, model_pipeline, df)
+
+    # Display and visualize the results
+    print(future_data.head())
+    plot_user_selected_predictions(future_data, commodity, start_year, end_year)
+
+# Run the main function
+if __name__ == "__main__":
+    main()
+
